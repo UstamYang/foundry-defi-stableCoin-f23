@@ -124,7 +124,17 @@ contract DSCEngine is ReentrancyGuard {
     // External functions //
     ////////////////////////
 
-    function depositCollateralAndMintDsc() external {}
+    /*
+    *@param tokenCollateralAddress The address of thet token to deposit *as collateral
+    *@param amountCollateral The amount of the token to deposit as *collateral
+    *param amountDscToMint The amount of decentralized stablecoint to mint
+    *@notice this function will deposit your collateral and mint you *DSC in one transaction
+    */
+
+    function depositCollateralAndMintDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToMint) external {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
     /*
      *@notice CEI
      *@param tokenCollateralAddress The address of thet token to deposit *as collateral
@@ -135,7 +145,7 @@ contract DSCEngine is ReentrancyGuard {
         address tokenCollateralAddress,
         uint256 amountCollateral
     )
-        external
+        public
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
@@ -159,8 +169,13 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     function redeemCollateralForDsc() external {}
+    //In order to redeem collateral
+    //1. health factor must be above 1 AFTER collateral pulled out
+    //DRY: Don't repeat yourself.
 
-    function reddemCollateral() external {}
+    function reddemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) nonReentrant {
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+    }
 
     /*
      *@notice follows CEI
@@ -171,7 +186,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function mintDsc(
         uint256 amountDscToMint
-    ) external moreThanZero(amountDscToMint) nonReentrant {
+    ) public moreThanZero(amountDscToMint) nonReentrant {
         s_DscMinted[msg.sender] += amountDscToMint;
         // if they minted too much?
         _revertIfHealthFactorIsBroken(msg.sender);
