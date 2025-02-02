@@ -84,6 +84,11 @@ contract DSCEngine is ReentrancyGuard {
         address indexed token,
         uint256 amount
     );
+    event CollateralRedeemd(
+        address indexed user,
+        address indexed token,
+        uint256 indexed amount
+    );
 
     ///////////////
     // Modifiers //
@@ -167,14 +172,33 @@ contract DSCEngine is ReentrancyGuard {
             revert ESCEngine__TransferFailed();
         }
     }
-
-    function redeemCollateralForDsc() external {}
+    /*
+    *@param tokenCollateralAddress The collateral address to redeem
+    *@param amountCollateral The amount of collateral to redeem
+    *@param amountDscToBurn The amount of dsc to burn
+    *This function burns DSC and redeems collateral in one transaction
+    */
+    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn) external {
+        burnDsc(amountDscToBurn);
+        redeemCollateral(tokenCollateralAddress, amountCollateral);
+        //redeemCollateral has checked the health factor
+    }
     //In order to redeem collateral
     //1. health factor must be above 1 AFTER collateral pulled out
     //DRY: Don't repeat yourself.
+    //Follow CET: Checks, Effects, Interactions
 
-    function reddemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) nonReentrant {
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant {
         s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemd(msg.sender,, amountCollateral, tokenCollateralAddress);
+        bool success = IERC20(tokenCollateralAddress).transfer(
+            msg.sender,
+            amountCollateral
+        );
+        if (!success) {
+            revert ESCEngine__TransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
     }
 
     /*
@@ -196,7 +220,19 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function burnDsc() external {}
+    function burnDsc(uint256 amount) public moreThanZero(amount){
+        s_DscMinted[msg.sender] -= amount;
+        bool success = i_dsc.transferFrom(msg.sender, address(this), amount);
+        if (!success) {
+            revert ESCEngine__MintferFailed();
+        }
+        //This conditional is hypothitically unreachable
+        if (!success) {
+            revert ESCEngine__TransferFailed();
+        }
+        i_dsc.burn(amount);
+        _revertIfHealthFactorIsBroken(msg.sender); //bakcup, this should not be triggered.
+    }
 
     function liquidate() external {}
 
