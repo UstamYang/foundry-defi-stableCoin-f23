@@ -15,7 +15,6 @@ contract DSCEngineTest is Test {
     HelperConfig config;
     address ethUsdPriceFeed;
     address weth;
-    
 
     address public USER = makeAddr("user");
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
@@ -23,13 +22,14 @@ contract DSCEngineTest is Test {
 
     function setUp() public {
         deployer = new DeployDSC();
-        (dsc, dsce,config) = deployer.run();
+        (dsc, dsce, config) = deployer.run();
         (ethUsdPriceFeed,, weth,,) = config.activeNetworkConfig();
         ERC20Mock(weth).mint(USER, STARTING_BALACEN);
     }
-/*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
                               PRICE TESTS
     //////////////////////////////////////////////////////////////*/
+
     function testGetUsdValue() public {
         uint256 ethAmound = 15e18;
         //15e18 *2000/ETH = 30,000E18;
@@ -40,6 +40,7 @@ contract DSCEngineTest is Test {
     /*//////////////////////////////////////////////////////////////
                             COLLATERAL TEST
     //////////////////////////////////////////////////////////////*/
+
     function testRevertsIfCollateralIsZero() public {
         vm.startPrank(USER);
         ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
