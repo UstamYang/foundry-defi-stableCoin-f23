@@ -52,11 +52,11 @@ contract DSCEngine is ReentrancyGuard {
     // Errors //
     //////////////
     error DSCEngine__NeedsMoreThanZero();
-    error ESCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
-    error ESCEngine__NotAllowedToekn();
-    error ESCEngine__TransferFailed();
+    error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+    error DSCEngine__NotAllowedToken();
+    error DSCEngine__TransferFailed();
     error DSCEngine__BreaksHealthFactor(uint256 heatlthFactor);
-    error ESCEngine__MintferFailed();
+    error DSCEngine__MintferFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFacorNotImproved();
 
@@ -98,7 +98,7 @@ contract DSCEngine is ReentrancyGuard {
 
     modifier isAllowedToken(address token) {
         if (s_priceFeeds[token] == address(0)) {
-            revert ESCEngine__NotAllowedToekn();
+            revert DSCEngine__NotAllowedToken();
         }
         _;
     }
@@ -108,7 +108,7 @@ contract DSCEngine is ReentrancyGuard {
     //////////////
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddress, address dscAddress) {
         if (tokenAddresses.length != priceFeedAddress.length) {
-            revert ESCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+            revert DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
         }
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddress[i];
@@ -152,7 +152,7 @@ contract DSCEngine is ReentrancyGuard {
         emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
         if (!success) {
-            revert ESCEngine__TransferFailed();
+            revert DSCEngine__TransferFailed();
         }
     }
     /*
@@ -195,7 +195,7 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorIsBroken(msg.sender);
         bool minted = i_dsc.mint(msg.sender, amountDscToMint);
         if (!minted) {
-            revert ESCEngine__MintferFailed();
+            revert DSCEngine__MintferFailed();
         }
     }
 
@@ -265,7 +265,7 @@ contract DSCEngine is ReentrancyGuard {
         bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
         //This conditional is hypothitically unreachable
         if (!success) {
-            revert ESCEngine__TransferFailed();
+            revert DSCEngine__TransferFailed();
         }
         i_dsc.burn(amountDscToBurn);
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -278,7 +278,7 @@ contract DSCEngine is ReentrancyGuard {
         emit CollateralRedeemd(from, to, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
         if (!success) {
-            revert ESCEngine__TransferFailed();
+            revert DSCEngine__TransferFailed();
         }
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -316,6 +316,7 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////////////////////////
     // Public and External view functions //
     ////////////////////////////////////////
+
     /*
     *@param usdAmountInWei The amount of debt in usd *e18
     *This function get the debt amount in terms of the collateral token
@@ -323,7 +324,6 @@ contract DSCEngine is ReentrancyGuard {
     */
     function getAmountFromUsd(address token, uint256 usdAmountInWei) public view returns (uint256) {
         // price of ETH (other tokens)
-        //$ETJ ETH??
         //$1000 /$2000 ETH = 0.5 ETH
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
@@ -343,5 +343,13 @@ contract DSCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION; //value from chainlink is 1000*10^8, so we need to multiply by 10^10 to get the correct value, assuming ETH = 1000 USD
+    }
+
+    function getAccountInformation(address user)
+        external
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
+        (totalDscMinted, collateralValueInUsd) = _getAccountInformation(user);
     }
 }
