@@ -109,7 +109,7 @@ contract DSCEngineTest is Test {
         assertEq(AMOUNT_COLLATERAL, expectedDepositAmount);
     }
 
-    function testdepositCollateralAndMintDsc() public{
+    function testdepositCollateralAndMintDsc() public {
         vm.startPrank(USER);
         ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
         dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, 2000);
@@ -123,5 +123,4 @@ contract DSCEngineTest is Test {
         assertEq(expectedHealthFactor, actualHealthFactor);
         vm.stopPrank();
     }
-
 }
