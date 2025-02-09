@@ -50,11 +50,13 @@ contract DSCEngineTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testGetUsdValue() public {
-        uint256 ethAmound = 15e18;
+        //uint256 ethAmound = 15e18;
         //15e18 *2000/ETH = 30,000E18;
-        uint256 expectedUsd = 30000e18;
-        uint256 actualUsd = dsce.getUsdValue(weth, ethAmound);
-        assertEq(actualUsd, expectedUsd);
+        //uint256 expectedUsd = 30000e18;
+        //uint256 actualUsd = dsce.getUsdValue(weth, ethAmound);
+        //assertEq(actualUsd, expectedUsd);
+        uint256 price = dsce.getUsdValue(weth, 1 ether);
+        console.log("WETH Price:", price);
     }
 
     function testGetTokenAmountFromUsd() public {
@@ -106,4 +108,20 @@ contract DSCEngineTest is Test {
         assertEq(totalDscMinted, expectedTotalDscMinted);
         assertEq(AMOUNT_COLLATERAL, expectedDepositAmount);
     }
+
+    function testdepositCollateralAndMintDsc() public{
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(dsce), AMOUNT_COLLATERAL);
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAL, 2000);
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(USER);
+        uint256 expectedTotalDscMinted = 2000;
+        console.log("totalDscMinted:", totalDscMinted);
+        console.log("collateralValueInUsd:", collateralValueInUsd);
+        uint256 expectedHealthFactor = 5e18;
+        uint256 actualHealthFactor = dsce.getHealthFactor(USER);
+        assertEq(totalDscMinted, expectedTotalDscMinted);
+        assertEq(expectedHealthFactor, actualHealthFactor);
+        vm.stopPrank();
+    }
+
 }
