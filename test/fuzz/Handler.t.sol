@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: MIT
 // Handler is  going to narrow down he way we call function
 pragma solidity ^0.8.18;
-import {Test,console} from "forge-std/Test.sol";
+
+import {Test, console} from "forge-std/Test.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
@@ -24,9 +25,9 @@ contract Handler is Test {
 
     //call redeemCollateral when user has collateral
 
-    function depositCollateral (uint256 collateralSeed, uint256 amountCollateral) public {
+    function depositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-        amountCollateral = bound(amountCollateral,1, MAX_DEPOSITE_SIZE);
+        amountCollateral = bound(amountCollateral, 1, MAX_DEPOSITE_SIZE);
 
         vm.startPrank(msg.sender);
         collateral.mint(msg.sender, amountCollateral);
@@ -37,11 +38,10 @@ contract Handler is Test {
     }
 
     //Helper Functions
-    function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock){
-        if (collateralSeed % 2 ==0) {
+    function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {
+        if (collateralSeed % 2 == 0) {
             return weth;
+        }
+        return wbtc;
     }
-            return wbtc;   
-    }
-
 }
