@@ -13,6 +13,9 @@ contract Handler is Test {
     ERC20Mock weth;
     ERC20Mock wbtc;
 
+    uint256 public timeMintIsCalled;
+    address[] public userWithCollateralDeposited;
+
     uint256 MAX_DEPOSITE_SIZE = type(uint96).max; //max of uint96 value
 
     constructor(DSCEngine _dscEngine, DecentralizedStableCoin _dsc) {
@@ -35,23 +38,71 @@ contract Handler is Test {
         //console.log("Deposit Collateral:", amountCollateral);
         dsce.depositCollateral(address(collateral), amountCollateral);
         vm.stopPrank();
+        // there will be double push, but leave it as it now
+        userWithCollateralDeposited.push(msg.sender);
     }
 
+    // function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
+    //     ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
+    //     uint256 maxCollateralToRedeem = dsce.getCollateralBalanceOfUser(msg.sender, address(collateral));
+
+    //     amountCollateral = bound(amountCollateral, 0, maxCollateralToRedeem);
+    //     if (amountCollateral == 0) {
+    //         return;
+    //     }
+    //     vm.prank(msg.sender);
+    //     dsce.redeemCollateral(address(collateral), amountCollateral);
+    //     vm.stopPrank();
+    // }
+
+    //Deepseek version of redeemCollateral()
     function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-        uint256 maxCollateralToRedeem = dsce.getCollateralBalanceOfUser(msg.sender, address(collateral));
-        amountCollateral = bound(amountCollateral, 0, maxCollateralToRedeem);
-        if (amountCollateral == 0) {
-            return;
+
+        // 获取用户账户信息
+        (uint256 totalDscMinted, uint256 totalCollateralValueInUsd) = dsce.getAccountInformation(msg.sender);
+        uint256 collateralAmount = dsce.getAmountFromUsd(collateral, totalCollateralValueInUsd);
+
+        // 计算用户当前抵押品的价值
+        uint256 userCollateralValue = dsce.getAccountCollateralValue(msg.sender);
+
+        uint256 maxRedeemableValue;
+        if (totalDscMinted == 0) {
+            maxRedeemableValue = userCollateralValue; // 无债务可全额赎回
+        } else {
+            // 计算允许赎回的最大总价值
+            maxRedeemableValue =
+                totalCollateralValueInUsd / 2 > totalDscMinted ? totalCollateralValueInUsd / 2 - totalDscMinted : 0;
+            // 不能超过当前抵押品的价值
+            //maxRedeemableValue = min(maxRedeemableValue, userCollateralValue);
         }
-        vm.prank(msg.sender);
+
+        // 转换为抵押品数量
+        uint256 maxRedeemableAmount;
+        if (collateralAmount == 0) {
+            maxRedeemableAmount = 0;
+        } else {
+            maxRedeemableAmount = (maxRedeemableValue * (10 ** collateralDecimals)) / collateralPrice;
+        }
+
+        // 确保不超过用户当前余额
+        maxRedeemableAmount = min(maxRedeemableAmount, userCollateralBalance);
+        amountCollateral = bound(amountCollateral, 0, maxRedeemableAmount);
+
+        if (amountCollateral == 0) return;
+
+        vm.startPrank(msg.sender);
         dsce.redeemCollateral(address(collateral), amountCollateral);
         vm.stopPrank();
     }
 
-    function mintDsc(uint256 amountDscToMint) public {
+    function mintDsc(uint256 amountDscToMint, uint256 addressSeed) public {
         //amountDscToMint = bound(amountDscToMint, 1, MAX_DEPOSITE_SIZE);
-        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(msg.sender);
+        if (userWithCollateralDeposited.length == 0) {
+            return;
+        }
+        address sender = userWithCollateralDeposited[addressSeed % userWithCollateralDeposited.length];
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(sender);
         int256 maxDscToMint = (int256(collateralValueInUsd) / 2) - int256(totalDscMinted);
         if (maxDscToMint < 0) {
             return;
@@ -60,9 +111,10 @@ contract Handler is Test {
         if (amountDscToMint == 0) {
             return;
         }
-        vm.prank(msg.sender);
+        vm.prank(sender);
         dsce.mintDsc(amountDscToMint);
         vm.stopPrank();
+        timeMintIsCalled++;
     }
 
     //Helper Functions
@@ -71,5 +123,9 @@ contract Handler is Test {
             return weth;
         }
         return wbtc;
+    }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
     }
 }
