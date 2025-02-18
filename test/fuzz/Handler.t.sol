@@ -58,41 +58,16 @@ contract Handler is Test {
     //Deepseek version of redeemCollateral()
     function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
+        address collateralAddress = address(collateral);
 
-        // 获取用户账户信息
-        (uint256 totalDscMinted, uint256 totalCollateralValueInUsd) = dsce.getAccountInformation(msg.sender);
-        uint256 collateralAmount = dsce.getAmountFromUsd(collateral, totalCollateralValueInUsd);
-
-        // 计算用户当前抵押品的价值
-        uint256 userCollateralValue = dsce.getAccountCollateralValue(msg.sender);
-
-        uint256 maxRedeemableValue;
-        if (totalDscMinted == 0) {
-            maxRedeemableValue = userCollateralValue; // 无债务可全额赎回
-        } else {
-            // 计算允许赎回的最大总价值
-            maxRedeemableValue =
-                totalCollateralValueInUsd / 2 > totalDscMinted ? totalCollateralValueInUsd / 2 - totalDscMinted : 0;
-            // 不能超过当前抵押品的价值
-            //maxRedeemableValue = min(maxRedeemableValue, userCollateralValue);
-        }
-
-        // 转换为抵押品数量
-        uint256 maxRedeemableAmount;
-        if (collateralAmount == 0) {
-            maxRedeemableAmount = 0;
-        } else {
-            maxRedeemableAmount = (maxRedeemableValue * (10 ** collateralDecimals)) / collateralPrice;
-        }
-
-        // 确保不超过用户当前余额
-        maxRedeemableAmount = min(maxRedeemableAmount, userCollateralBalance);
-        amountCollateral = bound(amountCollateral, 0, maxRedeemableAmount);
+        // 获取最大可赎回数量
+        uint256 maxCollateralToRedeem = dsce.getMaxCollateralToRedeem(msg.sender, collateralAddress);
+        amountCollateral = bound(amountCollateral, 0, maxCollateralToRedeem);
 
         if (amountCollateral == 0) return;
 
         vm.startPrank(msg.sender);
-        dsce.redeemCollateral(address(collateral), amountCollateral);
+        dsce.redeemCollateral(collateralAddress, amountCollateral);
         vm.stopPrank();
     }
 

@@ -381,4 +381,41 @@ contract DSCEngine is ReentrancyGuard {
     function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
         return s_collateralDeposited[user][token];
     }
+
+    // This function check the amount of each type of collaterals the user can redeem
+    function getMaxCollateralToRedeem(address user, address token) public view returns (uint256) {
+        uint256 totalDscMinted = s_DscMinted[user];
+
+        // 如果没有债务，可赎回全部抵押品
+        if (totalDscMinted == 0) {
+            return s_collateralDeposited[user][token];
+        }
+
+        // 获取总抵押品价值
+        uint256 totalCollateralValue = getAccountCollateralValue(user);
+        // 计算维持健康因子所需的最小抵押品价值
+        uint256 minRequiredCollateralValue =
+            (totalDscMinted * MIN_HEALTH_FACTOR * LIQUIDATION_PRECISION) / (LIQUIDATION_THRESHOLD * PRECISION);
+
+        // 如果当前抵押品不足，无法赎回
+        if (totalCollateralValue < minRequiredCollateralValue) {
+            return 0;
+        }
+
+        // 可赎回的USD价值上限
+        uint256 maxUsdToRedeem = totalCollateralValue - minRequiredCollateralValue;
+        // 获取目标抵押品的当前USD价值
+        uint256 tokenCollateralValue = getUsdValue(token, s_collateralDeposited[user][token]);
+
+        // 计算该抵押品实际可赎回的USD价值
+        uint256 redeemableUsd = tokenCollateralValue < maxUsdToRedeem ? tokenCollateralValue : maxUsdToRedeem;
+        if (redeemableUsd == 0) return 0;
+
+        // USD价值转换为代币数量
+        uint256 redeemableAmount = getAmountFromUsd(token, redeemableUsd);
+        // 不能超过用户实际持有量
+        return redeemableAmount > s_collateralDeposited[user][token]
+            ? s_collateralDeposited[user][token]
+            : redeemableAmount;
+    }
 }
