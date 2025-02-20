@@ -29,6 +29,7 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 /*
  *@title DSCEngine
@@ -59,6 +60,11 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintferFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFacorNotImproved();
+
+    /////////////////////
+    // Type            //
+    ////////////////////
+    using OracleLib for AggregatorV3Interface;
 
     /////////////////////
     // State Variables //
@@ -339,7 +345,7 @@ contract DSCEngine is ReentrancyGuard {
         // price of ETH (other tokens)
         //$1000 /$2000 ETH = 0.5 ETH
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.stalePriceCheckLatestRoundData();
         return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 
@@ -354,7 +360,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.stalePriceCheckLatestRoundData();
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION; //value from chainlink is 1000*10^8, so we need to multiply by 10^10 to get the correct value, result is USD in e18
     }
 
@@ -417,5 +423,17 @@ contract DSCEngine is ReentrancyGuard {
         return redeemableAmount > s_collateralDeposited[user][token]
             ? s_collateralDeposited[user][token]
             : redeemableAmount;
+    }
+
+    function getLiquidationBonus() external pure returns (uint256) {
+        return LIQUIDATION_BONUS;
+    }
+
+    function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    function getCollateralTokenPriceFeed(address token) external view returns (address) {
+        return s_priceFeeds[token];
     }
 }
